@@ -1,6 +1,7 @@
 package emanondev.itemedit.command.itemedit;
 
 import emanondev.itemedit.Util;
+import emanondev.itemedit.UtilMiniMessage;
 import emanondev.itemedit.command.ItemEditCommand;
 import emanondev.itemedit.command.SubCmd;
 import org.bukkit.command.CommandSender;
@@ -26,14 +27,14 @@ public class Rename extends SubCmd {
 
         ItemMeta itemMeta = item.getItemMeta();
         if (args.length == 1) {
-            itemMeta.setDisplayName(" ");
+            itemMeta.displayName(UtilMiniMessage.deserialize(" "));
             item.setItemMeta(itemMeta);
             p.updateInventory();
             return;
         }
 
         if (args.length == 2 && args[1].equalsIgnoreCase("clear")) {
-            itemMeta.setDisplayName(null);
+            itemMeta.displayName(null);
             item.setItemMeta(itemMeta);
             p.updateInventory();
             return;
@@ -43,11 +44,11 @@ public class Rename extends SubCmd {
         for (int i = 2; i < args.length; i++)
             bname.append(" ").append(args[i]);
 
-        String name = Util.formatText(p, bname.toString(), getPermission());
-        if (Util.hasBannedWords(p, name))
-            return;
+//        String name = Util.formatText(p, bname.toString(), getPermission());
+//        if (Util.hasBannedWords(p, name))
+//            return;
 
-        itemMeta.setDisplayName(name);
+        itemMeta.displayName(UtilMiniMessage.deserialize(bname.toString()));
         item.setItemMeta(itemMeta);
         p.updateInventory();
     }
@@ -62,7 +63,7 @@ public class Rename extends SubCmd {
         if (item != null && item.hasItemMeta()) {
             ItemMeta meta = item.getItemMeta();
             if (meta.hasDisplayName())
-                return Util.complete(args[1], meta.getDisplayName().replace('§', '&'), "clear");
+                return Util.complete(args[1], UtilMiniMessage.serialize(meta.displayName()), "clear");
         }
         return Collections.emptyList();
     }

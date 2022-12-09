@@ -10,6 +10,7 @@ import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Lore extends SubCmd {
 
@@ -80,7 +81,11 @@ public class Lore extends SubCmd {
             ItemMeta meta = item.getItemMeta();
             if (!meta.hasLore())
                 return;
-            List<String> lore = meta.getLore();
+            List<String> lore = Optional.ofNullable(meta.lore())
+                                        .orElse(new ArrayList<>())
+                                        .stream()
+                                        .map(UtilMiniMessage::serialize)
+                                        .collect(Collectors.toList());
             String from;
             String to;
             if (args.length == 4) {
@@ -118,8 +123,7 @@ public class Lore extends SubCmd {
             to = UtilsString.fix(to, null, true);
             for (int i = 0; i < lore.size(); i++)
                 lore.set(i, lore.get(i).replace(from, to));
-            meta.setLore(lore);
-            item.setItemMeta(meta);
+            item.lore(UtilMiniMessage.deserialize(lore));
             p.updateInventory();
         } catch (Exception e) {
             p.spigot().sendMessage(this.craftFailFeedback(getLanguageString("replace.params", null, p),
@@ -137,9 +141,7 @@ public class Lore extends SubCmd {
             Util.sendMessage(p, this.getLanguageString("paste.no-copy", null, p));
             return;
         }
-        ItemMeta meta = item.getItemMeta();
-        meta.setLore(copies.get(p.getUniqueId()));
-        item.setItemMeta(meta);
+        item.lore(UtilMiniMessage.deserialize(copies.get(p.getUniqueId())));
         Util.sendMessage(p, this.getLanguageString("paste.feedback", null, p));
         p.updateInventory();
     }
@@ -150,7 +152,8 @@ public class Lore extends SubCmd {
         if (item.hasItemMeta()) {
             ItemMeta itemMeta = item.getItemMeta();
             if (itemMeta.hasLore())
-                lore = new ArrayList<>(itemMeta.getLore());
+                //noinspection DataFlowIssue
+                lore = UtilMiniMessage.serialize(itemMeta.lore());
             else
                 lore = new ArrayList<>();
         } else
@@ -165,12 +168,11 @@ public class Lore extends SubCmd {
         List<String> lore;
         if (item.hasItemMeta()) {
             ItemMeta itemMeta = item.getItemMeta();
-            if (!(itemMeta instanceof BookMeta)) {
+            if (!(itemMeta instanceof BookMeta meta)) {
                 Util.sendMessage(p, this.getLanguageString("copyBook.wrong-type", null, p));
                 return;
             }
-            BookMeta meta = (BookMeta) itemMeta;
-            List<String> pages = meta.getPages();
+            List<String> pages = UtilMiniMessage.serialize(meta.pages());
             lore = new ArrayList<>();
             if (pages != null)
                 for (String page : pages) {
@@ -180,8 +182,7 @@ public class Lore extends SubCmd {
                 }
         } else
             lore = new ArrayList<>();
-        for (int i = 0; i < lore.size(); i++)
-            lore.set(i, Util.formatText(p, lore.get(i), getPermission()));
+        lore.replaceAll(text -> Util.formatText(p, text, getPermission()));
         copies.put(p.getUniqueId(), lore);
         Util.sendMessage(p, this.getLanguageString("copyBook.feedback", null, p));
     }
@@ -196,8 +197,7 @@ public class Lore extends SubCmd {
             return;
         }
         List<String> lore = new ArrayList<>(loreCopy.getStringList(args[2]));
-        for (int i = 0; i < lore.size(); i++)
-            lore.set(i, Util.formatText(p, lore.get(i), getPermission()));
+        lore.replaceAll(text -> Util.formatText(p, text, getPermission()));
         copies.put(p.getUniqueId(), lore);
         Util.sendMessage(p, this.getLanguageString("copyFile.feedback", null, p));
     }
@@ -205,15 +205,14 @@ public class Lore extends SubCmd {
     @Override
     public List<String> onComplete(CommandSender sender, String[] args) {
         switch (args.length) {
-            case 2:
+            case 2 -> {
                 return Util.complete(args[1], loreSub);
-            case 3:
+            }
+            case 3 -> {
                 switch (args[1].toLowerCase(Locale.ENGLISH)) {
-                    case "remove":
-                    case "set":
-                        if (!(sender instanceof Player))
+                    case "remove", "set" -> {
+                        if (!(sender instanceof Player player))
                             return Collections.emptyList();
-                        Player player = (Player) sender;
                         ItemStack item = this.getItemInHand(player);
                         if (Util.isAirOrNull(item))
                             return Collections.emptyList();
@@ -223,34 +222,37 @@ public class Lore extends SubCmd {
                         if (!meta.hasLore())
                             return Util.complete(args[2], Arrays.asList("1", "last"));
                         List<String> list = new ArrayList<>();
-                        for (int i = 0; i<meta.getLore().size();i++)
-                            list.add(String.valueOf(i+1));
+                        for (int i = 0; i < meta.lore().size(); i++)
+                            list.add(String.valueOf(i + 1));
                         list.add("last");
                         return Util.complete(args[2], list);
-                    case "copyfile":
+                    }
+                    case "copyfile" -> {
                         return Util.complete(args[2], loreCopy.getKeys(false));
+                    }
                 }
                 return Collections.emptyList();
-            case 4:
-                switch (args[1].toLowerCase(Locale.ENGLISH)) {
-                    case "set":
-                        if (sender instanceof Player) {
-                            ItemStack item = this.getItemInHand((Player) sender);
-                            if (item != null && item.hasItemMeta()) {
-                                ItemMeta meta = item.getItemMeta();
-                                if (meta.hasLore()) {
-
-                                    List<String> lore = meta.getLore();
-
-                                    int line = args[2].equalsIgnoreCase("last") ?
-                                            lore.size() - 1 : Integer.parseInt(args[2]) - 1;
-                                    if (line < 0 || line >= lore.size())
-                                        return Collections.emptyList();
-                                    return Util.complete(args[3], lore.get(line).replace('§', '&'));
-                                }
+            }
+            case 4 -> {
+                if (args[1].toLowerCase(Locale.ENGLISH).equals("set")) {
+                    if (sender instanceof Player) {
+                        ItemStack item = this.getItemInHand((Player) sender);
+                        if (item != null && item.hasItemMeta()) {
+                            ItemMeta meta = item.getItemMeta();
+                            if (meta.hasLore()) {
+                                //noinspection DataFlowIssue
+                                List<String> lore = UtilMiniMessage.serialize(meta.lore());
+                                int line = args[2].equalsIgnoreCase("last")
+                                           ? lore.size() - 1
+                                           : Integer.parseInt(args[2]) - 1;
+                                if (line < 0 || line >= lore.size())
+                                    return Collections.emptyList();
+                                return Util.complete(args[3], lore.get(line));
                             }
                         }
+                    }
                 }
+            }
         }
         return Collections.emptyList();
     }
@@ -270,16 +272,17 @@ public class Lore extends SubCmd {
 
         List<String> lore;
         if (itemMeta.hasLore())
-            lore = new ArrayList<>(itemMeta.getLore());
+            //noinspection DataFlowIssue
+            lore = UtilMiniMessage.serialize(itemMeta.lore());
         else
             lore = new ArrayList<>();
 
-        text = new StringBuilder(Util.formatText(p, text.toString(), getPermission()));
-        if (Util.hasBannedWords(p, text.toString()))
-            return;
+//        text = new StringBuilder(Util.formatText(p, text.toString(), getPermission()));
+//        if (Util.hasBannedWords(p, text.toString()))
+//            return;
 
         lore.add(text.toString());
-        itemMeta.setLore(lore);
+        itemMeta.lore(UtilMiniMessage.deserialize(lore));
         item.setItemMeta(itemMeta);
         p.updateInventory();
     }
@@ -305,19 +308,20 @@ public class Lore extends SubCmd {
 
             List<String> lore;
             if (itemMeta.hasLore())
-                lore = new ArrayList<>(itemMeta.getLore());
+                //noinspection DataFlowIssue
+                lore = UtilMiniMessage.serialize(itemMeta.lore());
             else
                 lore = new ArrayList<>();
 
             for (int i = lore.size(); i <= line; i++)
                 lore.add("");
 
-            text = new StringBuilder(Util.formatText(p, text.toString(), getPermission()));
-            if (Util.hasBannedWords(p, text.toString()))
-                return;
+//            text = new StringBuilder(Util.formatText(p, text.toString(), getPermission()));
+//            if (Util.hasBannedWords(p, text.toString()))
+//                return;
 
             lore.add(line, text.toString());
-            itemMeta.setLore(lore);
+            itemMeta.lore(UtilMiniMessage.deserialize(lore));
             item.setItemMeta(itemMeta);
             p.updateInventory();
         } catch (Exception e) {
@@ -344,23 +348,25 @@ public class Lore extends SubCmd {
 
             List<String> lore;
             if (itemMeta.hasLore())
-                lore = new ArrayList<>(itemMeta.getLore());
+                //noinspection DataFlowIssue
+                lore = UtilMiniMessage.serialize(itemMeta.lore());
             else
                 lore = new ArrayList<>();
-            int line = args[2].equalsIgnoreCase("last") ?
-                    lore.size() - 1 : Integer.parseInt(args[2]) - 1;
+            int line = args[2].equalsIgnoreCase("last")
+                       ? lore.size() - 1
+                       : Integer.parseInt(args[2]) - 1;
             if (line < 0)
                 throw new IllegalArgumentException("Wrong line number");
 
             for (int i = lore.size(); i <= line; i++)
                 lore.add("");
 
-            text = new StringBuilder(Util.formatText(p, text.toString(), getPermission()));
-            if (Util.hasBannedWords(p, text.toString()))
-                return;
+//            text = new StringBuilder(Util.formatText(p, text.toString(), getPermission()));
+//            if (Util.hasBannedWords(p, text.toString()))
+//                return;
 
             lore.set(line, text.toString());
-            itemMeta.setLore(lore);
+            itemMeta.lore(UtilMiniMessage.deserialize(lore));
             item.setItemMeta(itemMeta);
             p.updateInventory();
         } catch (Exception e) {
@@ -376,9 +382,11 @@ public class Lore extends SubCmd {
             if (!item.hasItemMeta())
                 return;
             ItemMeta itemMeta = item.getItemMeta();
-            if (!itemMeta.hasLore() || itemMeta.getLore().size() == 0)
+            //noinspection DataFlowIssue
+            if (!itemMeta.hasLore() || itemMeta.lore().size() == 0)
                 return;
-            List<String> lore = new ArrayList<>(itemMeta.getLore());
+            //noinspection DataFlowIssue
+            List<String> lore = UtilMiniMessage.serialize(itemMeta.lore());
             int line;
             if (args[2].equalsIgnoreCase("last"))
                 line = lore.size() - 1;
@@ -391,7 +399,7 @@ public class Lore extends SubCmd {
                 return;
 
             lore.remove(line);
-            itemMeta.setLore(lore);
+            itemMeta.lore(UtilMiniMessage.deserialize(lore));
             item.setItemMeta(itemMeta);
             p.updateInventory();
         } catch (Exception e) {
@@ -402,7 +410,7 @@ public class Lore extends SubCmd {
 
     private void loreReset(Player p, ItemStack item, String[] args) {
         ItemMeta meta = item.getItemMeta();
-        meta.setLore(null);
+        meta.lore(null);
         item.setItemMeta(meta);
         p.updateInventory();
     }

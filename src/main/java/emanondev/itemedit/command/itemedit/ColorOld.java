@@ -28,12 +28,11 @@ public class ColorOld extends SubCmd {
     public void onCommand(CommandSender sender, String alias, String[] args) {
         Player p = (Player) sender;
         ItemStack item = this.getItemInHand(p);
-        if ((item.getItemMeta() instanceof LeatherArmorMeta)) {
+        if ((item.getItemMeta() instanceof LeatherArmorMeta leatherMeta)) {
             if (!sender.hasPermission(leatherPerm)) {
                 this.getCommand().sendPermissionLackMessage(leatherPerm, sender);
                 return;
             }
-            LeatherArmorMeta leatherMeta = (LeatherArmorMeta) item.getItemMeta();
             try {
                 if (args.length != 4)
                     throw new IllegalArgumentException("Wrong param number");
@@ -48,13 +47,12 @@ public class ColorOld extends SubCmd {
             }
             return;
         }
-        if (item.getItemMeta() instanceof FireworkEffectMeta){
+        if (item.getItemMeta() instanceof FireworkEffectMeta starMeta){
             if (!sender.hasPermission(starsPerm)) {
                 this.getCommand().sendPermissionLackMessage(starsPerm, sender);
                 return;
             }
 
-            FireworkEffectMeta starMeta = (FireworkEffectMeta) item.getItemMeta();
             try {
                 if (args.length != 4)
                     throw new IllegalArgumentException("Wrong param number");
@@ -64,7 +62,7 @@ public class ColorOld extends SubCmd {
                 FireworkEffect oldEffect = starMeta.getEffect();
                 FireworkEffect.Builder newEffect = FireworkEffect.builder().flicker(oldEffect != null && oldEffect.hasFlicker())
                         .trail(oldEffect != null && oldEffect.hasTrail()).withColor(color);
-                if (oldEffect!=null && oldEffect.getFadeColors()!=null )
+                if (oldEffect != null)
                     newEffect.withFade(oldEffect.getFadeColors());
                 starMeta.setEffect(newEffect.build());
                 item.setItemMeta(starMeta);
